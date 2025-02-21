@@ -1,16 +1,15 @@
 ﻿using System;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
-class AsyncTCPClient
+class AsyncSocketClient
 {
     static async Task Main()
     {
-        TcpClient client = new();
-        await client.ConnectAsync("127.0.0.1", 5000);
-        
-        NetworkStream stream = client.GetStream();
+        Socket clientSocket = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        await clientSocket.ConnectAsync(new IPEndPoint(IPAddress.Loopback, 5000));
         Console.WriteLine("Connected to the server.");
 
         while (true)
@@ -19,36 +18,39 @@ class AsyncTCPClient
             string message = Console.ReadLine();
             if (message == "exit") break;
 
-            await SendMessageAsync(stream, message);
-            string response = await ReceiveMessageAsync(stream);
+            await SendMessageAsync(clientSocket, message);
+            string response = await ReceiveMessageAsync(clientSocket);
             Console.WriteLine("Server response: " + response);
             if (response == "Request limit exceeded. Try again later.") return;
         }
+
+        clientSocket.Close();
     }
 
-    private static async Task SendMessageAsync(NetworkStream stream, string message)
+    private static async Task SendMessageAsync(Socket clientSocket, string message)
     {
         byte[] buffer = Encoding.UTF8.GetBytes(message);
         try
         {
-            await stream.WriteAsync(buffer, 0, buffer.Length);
+            await clientSocket.SendAsync(buffer, SocketFlags.None);
         }
-        catch (Exception e)
+        catch (Exception)
         {
-            Console.WriteLine("Sending is imposible");
+            Console.WriteLine("Sending is impossible");
         }
     }
 
-    private static async Task<string> ReceiveMessageAsync(NetworkStream stream)
+    private static async Task<string> ReceiveMessageAsync(Socket clientSocket)
     {
         byte[] buffer = new byte[1024];
         int received = 0;
         try
         {
-            received = await stream.ReadAsync(buffer, 0, buffer.Length);
-        }catch(Exception e)
+            received = await clientSocket.ReceiveAsync(buffer, SocketFlags.None);
+        }
+        catch (Exception)
         {
-            Console.WriteLine("Recieve is imposible");
+            Console.WriteLine("Receive is impossible");
         }
 
         return Encoding.UTF8.GetString(buffer, 0, received);
